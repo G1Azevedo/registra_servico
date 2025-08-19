@@ -14,20 +14,19 @@ class ItemServico {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'servicoId': servicoId,
+      'servico_id': servicoId,
       'quantidade': quantidade,
-      'valorUnitario': valorUnitario,
+      'valor_unitario': valorUnitario,
     };
   }
 
   factory ItemServico.fromMap(Map<String, dynamic> map) {
     return ItemServico(
       id: map['id'],
-      servicoId: map['servicoId'],
+      servicoId: map['servico_id'],
       quantidade: map['quantidade'],
-      valorUnitario: map['valorUnitario'],
+      valorUnitario: map['valor_unitario'],
     );
   }
 }
-
 

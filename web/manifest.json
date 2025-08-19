@@ -1,6 +1,6 @@
 {
-    "name": "registra_servico",
-    "short_name": "registra_servico",
+    "name": "registra_servico_app",
+    "short_name": "registra_servico_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

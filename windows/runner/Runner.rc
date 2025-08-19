@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "registra_servico" "\0"
+            VALUE "FileDescription", "registra_servico_app" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "registra_servico" "\0"
+            VALUE "InternalName", "registra_servico_app" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "registra_servico.exe" "\0"
-            VALUE "ProductName", "registra_servico" "\0"
+            VALUE "OriginalFilename", "registra_servico_app.exe" "\0"
+            VALUE "ProductName", "registra_servico_app" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

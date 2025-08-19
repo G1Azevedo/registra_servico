@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
+import 'dart:io';
 import '../models/servico.dart';
+import '../models/item_servico.dart';
 import '../database/database_helper.dart';
-import '../services/pdf_service.dart';
-import '../services/pdf_service_premium.dart';
 
 class RelatorioScreen extends StatefulWidget {
   @override
@@ -10,57 +14,152 @@ class RelatorioScreen extends StatefulWidget {
 }
 
 class _RelatorioScreenState extends State<RelatorioScreen> {
-  DateTime _dataInicio = DateTime.now().subtract(Duration(days: 30));
+  DateTime _dataInicio = DateTime.now().subtract(Duration(days: 15));
   DateTime _dataFim = DateTime.now();
   DatabaseHelper dbHelper = DatabaseHelper();
-  bool _gerandoPdf = false;
+  bool _gerandoRelatorio = false;
 
-  Future<void> _gerarRelatorio({bool premium = false}) async {
+  Future<void> _gerarRelatorio() async {
     setState(() {
-      _gerandoPdf = true;
+      _gerandoRelatorio = true;
     });
 
     try {
+      // Buscar serviços no período
       List<Servico> todosServicos = await dbHelper.getServicos();
-      List<Servico> servicosFiltrados = todosServicos.where((servico) {
+      List<Servico> servicosPeriodo = todosServicos.where((servico) {
         return servico.dataServico.isAfter(_dataInicio.subtract(Duration(days: 1))) &&
                servico.dataServico.isBefore(_dataFim.add(Duration(days: 1)));
       }).toList();
 
-      if (servicosFiltrados.isEmpty) {
+      if (servicosPeriodo.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Nenhum serviço encontrado no período selecionado'),
-            backgroundColor: Colors.orange,
-          ),
+          SnackBar(content: Text('Nenhum serviço encontrado no período selecionado')),
         );
+        setState(() {
+          _gerandoRelatorio = false;
+        });
         return;
       }
 
-      String caminhoArquivo;
-      if (premium) {
-        caminhoArquivo = await PdfServicePremium.gerarRelatorioPdfPremium(_dataInicio, _dataFim);
-      } else {
-        caminhoArquivo = await PdfService.gerarRelatorioPdf(_dataInicio, _dataFim);
-      }
+      // Criar PDF
+      final pdf = pw.Document();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Relatório PDF ${premium ? 'Premium ' : ''}gerado com sucesso!\nSalvo em: $caminhoArquivo'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 5),
+      // Buscar itens para cada serviço
+      List<ServicoComItens> servicosComItens = [];
+      for (Servico servico in servicosPeriodo) {
+        List<ItemServico> itens = await dbHelper.getItensServico(servico.id!);
+        servicosComItens.add(ServicoComItens(servico: servico, itens: itens));
+      }
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'RELATÓRIO DE SERVIÇOS',
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  'Data de geração: ${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().month.toString().padLeft(2, '0')}/${DateTime.now().year}',
+                  style: pw.TextStyle(fontSize: 12),
+                ),
+                pw.Text(
+                  'Período: ${_dataInicio.day.toString().padLeft(2, '0')}/${_dataInicio.month.toString().padLeft(2, '0')}/${_dataInicio.year} a ${_dataFim.day.toString().padLeft(2, '0')}/${_dataFim.month.toString().padLeft(2, '0')}/${_dataFim.year}',
+                  style: pw.TextStyle(fontSize: 12),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Expanded(
+                  child: pw.ListView.builder(
+                    itemCount: servicosComItens.length,
+                    itemBuilder: (context, index) {
+                      ServicoComItens servicoComItens = servicosComItens[index];
+                      Servico servico = servicoComItens.servico;
+                      List<ItemServico> itens = servicoComItens.itens;
+                      
+                      return pw.Container(
+                        margin: pw.EdgeInsets.only(bottom: 15),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              '${index + 1}. ${servico.descricaoServico}',
+                              style: pw.TextStyle(
+                                fontSize: 14,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.SizedBox(height: 5),
+                            pw.Text(
+                              'Cliente: ${servico.nomeCliente}',
+                              style: pw.TextStyle(fontSize: 12),
+                            ),
+                            pw.Text(
+                              'Data: ${servico.dataServico.day.toString().padLeft(2, '0')}/${servico.dataServico.month.toString().padLeft(2, '0')}/${servico.dataServico.year}',
+                              style: pw.TextStyle(fontSize: 12),
+                            ),
+                            pw.SizedBox(height: 5),
+                            ...itens.map((item) => pw.Text(
+                              '${item.quantidade} x R\$ ${item.valorUnitario.toStringAsFixed(2)} = R\$ ${(item.quantidade * item.valorUnitario).toStringAsFixed(2)}',
+                              style: pw.TextStyle(fontSize: 11),
+                            )).toList(),
+                            pw.SizedBox(height: 5),
+                            pw.Text(
+                              'Total do Serviço: R\$ ${servico.valorTotal.toStringAsFixed(2)}',
+                              style: pw.TextStyle(
+                                fontSize: 12,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.Divider(),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+                pw.Container(
+                  padding: pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(),
+                  ),
+                  child: pw.Text(
+                    'TOTAL: R\$ ${servicosComItens.fold(0.0, (total, item) => total + item.servico.valorTotal).toStringAsFixed(2)}',
+                    style: pw.TextStyle(
+                      fontSize: 16,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       );
+
+      // Salvar PDF
+      final output = await getApplicationDocumentsDirectory();
+      final file = File('${output.path}/relatorio_servicos_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(await pdf.save());
+
+      // Abrir PDF automaticamente
+      await OpenFilex.open(file.path);
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao gerar relatório: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Erro ao gerar relatório: $e')),
       );
     } finally {
       setState(() {
-        _gerandoPdf = false;
+        _gerandoRelatorio = false;
       });
     }
   }
@@ -70,7 +169,7 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Gerar Relatório'),
-        backgroundColor: Colors.blue[700],
+        backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
       body: Padding(
@@ -94,7 +193,7 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
                   firstDate: DateTime(2020),
                   lastDate: DateTime.now(),
                 );
-                if (picked != null) {
+                if (picked != null && picked != _dataInicio) {
                   setState(() {
                     _dataInicio = picked;
                   });
@@ -119,7 +218,7 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
                   firstDate: DateTime(2020),
                   lastDate: DateTime.now(),
                 );
-                if (picked != null) {
+                if (picked != null && picked != _dataFim) {
                   setState(() {
                     _dataFim = picked;
                   });
@@ -139,74 +238,62 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
             SizedBox(
               width: double.infinity,
               height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _gerandoPdf ? null : () => _gerarRelatorio(premium: false),
-                icon: _gerandoPdf 
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
+              child: ElevatedButton(
+                onPressed: _gerandoRelatorio ? null : _gerarRelatorio,
+                child: _gerandoRelatorio
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Text('Gerando Relatório...'),
+                        ],
                       )
-                    : Icon(Icons.picture_as_pdf),
-                label: Text(
-                  _gerandoPdf ? 'Gerando PDF...' : 'Gerar Relatório PDF Simples',
-                  style: TextStyle(fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[700],
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _gerandoPdf ? null : () => _gerarRelatorio(premium: true),
-                icon: _gerandoPdf 
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : Icon(Icons.auto_awesome),
-                label: Text(
-                  _gerandoPdf ? 'Gerando PDF...' : 'Gerar Relatório PDF Premium',
-                  style: TextStyle(fontSize: 16),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple[700],
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.purple[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.purple[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.purple[700], size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'O relatório Premium inclui design aprimorado, estatísticas e layout profissional.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.purple[700],
+                    : Text(
+                        'Gerar Relatório',
+                        style: TextStyle(fontSize: 18),
                       ),
-                    ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(height: 24),
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.blue),
+                      SizedBox(width: 8),
+                      Text(
+                        'Informações',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'O relatório será gerado e aberto automaticamente com o aplicativo de PDF padrão do seu dispositivo.',
+                    style: TextStyle(color: Colors.blue[700]),
                   ),
                 ],
               ),
@@ -216,5 +303,12 @@ class _RelatorioScreenState extends State<RelatorioScreen> {
       ),
     );
   }
+}
+
+class ServicoComItens {
+  final Servico servico;
+  final List<ItemServico> itens;
+
+  ServicoComItens({required this.servico, required this.itens});
 }
 

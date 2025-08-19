@@ -16,22 +16,21 @@ class Servico {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'nomeCliente': nomeCliente,
-      'dataServico': dataServico.toIso8601String(),
-      'descricaoServico': descricaoServico,
-      'valorTotal': valorTotal,
+      'nome_cliente': nomeCliente,
+      'data_servico': dataServico.toIso8601String(),
+      'descricao_servico': descricaoServico,
+      'valor_total': valorTotal,
     };
   }
 
   factory Servico.fromMap(Map<String, dynamic> map) {
     return Servico(
       id: map['id'],
-      nomeCliente: map['nomeCliente'],
-      dataServico: DateTime.parse(map['dataServico']),
-      descricaoServico: map['descricaoServico'],
-      valorTotal: map['valorTotal'],
+      nomeCliente: map['nome_cliente'],
+      dataServico: DateTime.parse(map['data_servico']),
+      descricaoServico: map['descricao_servico'],
+      valorTotal: map['valor_total'],
     );
   }
 }
-
 

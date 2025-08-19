@@ -33,21 +33,21 @@ class DatabaseHelper {
       '''
       CREATE TABLE servicos(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nomeCliente TEXT,
-        dataServico TEXT,
-        descricaoServico TEXT,
-        valorTotal REAL
+        nome_cliente TEXT,
+        data_servico TEXT,
+        descricao_servico TEXT,
+        valor_total REAL
       )
       '''
     );
     await db.execute(
       '''
-      CREATE TABLE item_servicos(
+      CREATE TABLE itens_servico(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        servicoId INTEGER,
+        servico_id INTEGER,
         quantidade INTEGER,
-        valorUnitario REAL,
-        FOREIGN KEY (servicoId) REFERENCES servicos (id) ON DELETE CASCADE
+        valor_unitario REAL,
+        FOREIGN KEY (servico_id) REFERENCES servicos (id) ON DELETE CASCADE
       )
       '''
     );
@@ -60,22 +60,22 @@ class DatabaseHelper {
 
   Future<int> insertItemServico(ItemServico itemServico) async {
     Database db = await database;
-    return await db.insert('item_servicos', itemServico.toMap());
+    return await db.insert('itens_servico', itemServico.toMap());
   }
 
   Future<List<Servico>> getServicos() async {
     Database db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('servicos', orderBy: 'dataServico DESC');
+    final List<Map<String, dynamic>> maps = await db.query('servicos', orderBy: 'data_servico DESC');
     return List.generate(maps.length, (i) {
       return Servico.fromMap(maps[i]);
     });
   }
 
-  Future<List<ItemServico>> getItemServicos(int servicoId) async {
+  Future<List<ItemServico>> getItensServico(int servicoId) async {
     Database db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
-      'item_servicos',
-      where: 'servicoId = ?',
+      'itens_servico',
+      where: 'servico_id = ?',
       whereArgs: [servicoId],
     );
     return List.generate(maps.length, (i) {
@@ -101,6 +101,14 @@ class DatabaseHelper {
       whereArgs: [id],
     );
   }
-}
 
+  Future<int> deleteItemServico(int id) async {
+    Database db = await database;
+    return await db.delete(
+      'itens_servico',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+}
 
